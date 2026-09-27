@@ -1,0 +1,15 @@
+services:
+  terra:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./checkpoints:/app/checkpoints   # drop a trained best.pt here to switch to CNN mode
+      - ./data:/app/data                 # training data, if you train inside the container
+      - terra-history:/app/history-data  # persists history.db across restarts
+    environment:
+      - PYTHONUNBUFFERED=1
+      - HISTORY_DB_PATH=/app/history-data/history.db
+
+volumes:
+  terra-history:

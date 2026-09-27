@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+checkpoints/
+data/
+history.db
+*.db
+venv/
+.env

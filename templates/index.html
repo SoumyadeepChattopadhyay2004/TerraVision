@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terra — Land-Cover Classification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#1b2420; --paper:#eef1e8; --line:#c9d0bd; --panel:#dce2d2; --moss:#41533f; --clay:#a5622f;
+  }
+  [data-theme="dark"]{
+    --ink:#e9ede4; --paper:#12181a; --line:#33403a; --panel:#1c2522; --moss:#9ab89a; --clay:#e0975a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;line-height:1.5;transition:background .2s,color .2s}
+  h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;margin:0}
+  .wrap{max-width:1100px;margin:0 auto;padding:40px 24px 80px}
+  header{border-bottom:2px solid var(--ink);padding-bottom:20px;margin-bottom:28px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px}
+  header h1{font-size:2.2rem;letter-spacing:-0.01em}
+  header p{margin:6px 0 0;color:var(--moss);max-width:46ch}
+  .header-right{display:flex;align-items:center;gap:12px}
+  .mode-pill{font-size:.8rem;padding:5px 12px;border:1px solid var(--ink);border-radius:20px;white-space:nowrap}
+  .theme-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--ink);background:var(--panel);cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center}
+  .tabs{display:flex;gap:0;margin-bottom:24px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .tab{padding:10px 18px;cursor:pointer;font-weight:600;color:var(--moss);border-bottom:2px solid transparent}
+  .tab.active{color:var(--ink);border-color:var(--clay)}
+  .panel{display:none}
+  .panel.active{display:block}
+  .dropzone{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    min-height:140px;width:100%;
+    border:2px dashed var(--line);border-radius:8px;padding:28px;text-align:center;
+    background:var(--panel);cursor:pointer;transition:border-color .15s,background .15s;
+  }
+  .dropzone:hover{border-color:var(--clay)}
+  .dropzone.drag-active{border-color:var(--clay);background:color-mix(in srgb, var(--panel) 80%, var(--clay) 20%)}
+  .dropzone svg{width:30px;height:30px;stroke:var(--moss);flex-shrink:0}
+  .dropzone strong{font-size:.95rem}
+  .dropzone input{display:none}
+  .dropzone img.preview{margin-top:4px;max-height:140px;border-radius:4px}
+  .controls{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:16px 0}
+  .controls label{font-size:.85rem;color:var(--moss);display:flex;flex-direction:column;gap:4px}
+  .controls input[type=number],.controls select{padding:7px 10px;border:1px solid var(--line);border-radius:4px;background:var(--paper);color:var(--ink)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  @media(max-width:820px){.row,.row3{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px}
+  .card h3{font-size:.9rem;margin-bottom:10px;color:var(--moss)}
+  img.preview,canvas.preview{max-width:100%;border-radius:3px;display:block}
+  .compare-wrap{position:relative;overflow:hidden;border-radius:3px}
+  .compare-wrap > img{display:block;width:100%}
+  .compare-wrap .overlay-clip{position:absolute;top:0;left:0;height:100%;overflow:hidden}
+  .compare-wrap .overlay-clip img{position:absolute;top:0;left:0;max-width:none;height:100%}
+  .compare-slider{width:100%;margin-top:8px}
+  button.run{margin-top:6px;background:var(--ink);color:var(--paper);border:none;padding:12px 22px;font-size:.95rem;font-weight:600;border-radius:5px;cursor:pointer;transition:opacity .15s,transform .1s}
+  button.run:hover:not(:disabled){opacity:.88}
+  button.run:active:not(:disabled){transform:translateY(1px)}
+  button.run:disabled{opacity:.4;cursor:default}
+  button.ghost{background:transparent;border:1px solid var(--ink);color:var(--ink);padding:8px 14px;border-radius:5px;cursor:pointer;font-size:.85rem;font-weight:600;transition:background .15s}
+  button.ghost:hover{background:var(--panel)}
+  button:focus-visible,input:focus-visible,select:focus-visible,.dropzone:focus-within{outline:2px solid var(--clay);outline-offset:2px}
+  .stats{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+  .stat-row{display:flex;align-items:center;gap:10px;cursor:pointer}
+  .stat-label{width:110px;font-size:.85rem}
+  .stat-bar-bg{flex:1;background:var(--paper);border-radius:3px;height:14px;overflow:hidden;border:1px solid var(--line)}
+  .stat-bar{height:100%}
+  .stat-val{width:70px;text-align:right;font-size:.8rem;font-variant-numeric:tabular-nums}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:.82rem}
+  .legend span{display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:3px 8px;border-radius:12px;border:1px solid transparent}
+  .legend span.active{border-color:var(--ink)}
+  .swatch{width:12px;height:12px;border-radius:2px;display:inline-block}
+  .metrics-table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:6px}
+  .metrics-table th,.metrics-table td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+  .metrics-table th{color:var(--moss);font-weight:600}
+  .delta-up{color:#2e6b3e;font-weight:600}
+  .delta-down{color:#a5342a;font-weight:600}
+  .summary-badges{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px}
+  .badge{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:10px 16px;min-width:160px}
+  .badge .num{font-family:'Fraunces',serif;font-size:1.5rem}
+  .badge .lab{font-size:.78rem;color:var(--moss)}
+  .hint{color:var(--moss);font-size:.83rem;margin-top:6px}
+  footer{margin-top:60px;font-size:.8rem;color:var(--moss);border-top:1px solid var(--line);padding-top:16px}
+  .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .history-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .history-item:last-child{border-bottom:none}
+  .history-item img{width:56px;height:56px;object-fit:cover;border-radius:4px;flex-shrink:0}
+  .history-meta{font-size:.85rem}
+  .history-meta .when{color:var(--moss);font-size:.78rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>TerraVision: AI-Powered Land-Cover Mapping & Change Detection</h1>
+      <p>Upload satellite imagery for CNN-based land-cover segmentation, vegetation health mapping, landscape fragmentation analysis, and multi-date change detection.</p>
+    </div>
+    <div class="header-right">
+      <span class="mode-pill">{{ "Trained CNN (U-Net)" if mode == "cnn" else "Heuristic baseline" }}</span>
+      <button class="theme-btn" id="themeBtn" title="Toggle day/night mode">🌙</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="single">Classify</div>
+    <div class="tab" data-tab="change">Change detection</div>
+    <div class="tab" data-tab="history">History</div>
+    <div class="tab" data-tab="about">Methods</div>
+  </div>
+
+  <!-- SINGLE IMAGE PANEL -->
+  <div class="panel active" id="panel-single">
+    <label class="dropzone" id="drop-single">
+      <input type="file" id="file-single" accept="image/*">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/></svg>
+      <strong>Drop a satellite image here, or click to browse</strong>
+      <div class="hint">PNG / JPG · aerial or satellite tiles work best</div>
+    </label>
+
+    <div class="controls">
+      <label>Ground sample distance (m/pixel, optional)
+        <input type="number" id="gsd-single" step="0.1" min="0" placeholder="e.g. 10">
+      </label>
+      {% if has_cnn %}
+      <label>Engine
+        <select id="engine-single">
+          <option value="">Auto (CNN)</option>
+          <option value="cnn">Force CNN</option>
+          <option value="heuristic">Force heuristic (compare)</option>
+        </select>
+      </label>
+      {% endif %}
+    </div>
+
+    <button class="run" id="btn-single" disabled>Classify land cover</button>
+
+    <div class="row" style="margin-top:20px">
+      <div class="card"><h3>Segmentation (drag slider to compare)</h3>
+        <div class="compare-wrap" id="compare-wrap" style="display:none">
+          <img class="preview" id="preview-single">
+          <div class="overlay-clip" id="overlay-clip"><img class="preview" id="result-single"></div>
+        </div>
+        <input type="range" class="compare-slider" id="compare-slider" min="0" max="100" value="50" style="display:none">
+      </div>
+      <div class="card"><h3>Land-cover statistics</h3>
+        <canvas id="pieChart" height="180"></canvas>
+        <div class="stats" id="stats-single"></div>
+        <div class="legend" id="legend"></div>
+        <div class="hint" id="engine-used-note"></div>
+      </div>
+    </div>
+
+    <div class="row3" id="extra-maps" style="margin-top:20px;display:none">
+      <div class="card"><h3>Vegetation health index (proxy-NDVI)</h3><img class="preview" id="veg-map"></div>
+      <div class="card"><h3>Model confidence</h3><img class="preview" id="conf-map"></div>
+      <div class="card"><h3>Landscape fragmentation metrics</h3>
+        <table class="metrics-table" id="landscape-table">
+          <thead><tr><th>Class</th><th>Patches</th><th>Mean size (px)</th><th>Edge density</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="actions" id="actions-single" style="display:none">
+      <button class="ghost" id="export-csv">Export statistics (CSV)</button>
+      <button class="ghost" id="export-json">Export full report (JSON)</button>
+      <button class="ghost" id="export-pdf">Export PDF report</button>
+    </div>
+  </div>
+
+  <!-- CHANGE DETECTION PANEL -->
+  <div class="panel" id="panel-change">
+    <div class="row">
+      <label class="dropzone" id="drop-before">
+        <input type="file" id="file-before" accept="image/*">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/></svg>
+        <strong>Earlier image</strong><div class="hint">e.g. 2015</div>
+        <img class="preview" id="preview-before" style="display:none">
+      </label>
+      <label class="dropzone" id="drop-after">
+        <input type="file" id="file-after" accept="image/*">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/></svg>
+        <strong>Later image</strong><div class="hint">e.g. 2024, same location</div>
+        <img class="preview" id="preview-after" style="display:none">
+      </label>
+    </div>
+
+    <div class="controls">
+      <label>Ground sample distance (m/pixel, optional)
+        <input type="number" id="gsd-change" step="0.1" min="0" placeholder="e.g. 10">
+      </label>
+    </div>
+
+    <button class="run" id="btn-change" disabled>Detect change</button>
+
+    <div class="summary-badges" id="summary-badges" style="display:none"></div>
+
+    <div class="row" id="change-maps" style="display:none;margin-top:20px">
+      <div class="card"><h3>Before</h3><img class="preview" id="result-before"></div>
+      <div class="card"><h3>After</h3><img class="preview" id="result-after"></div>
+    </div>
+
+    <div class="row" style="margin-top:20px">
+      <div class="card" id="change-stats-card" style="display:none">
+        <h3>Change in land cover</h3>
+        <canvas id="changeChart" height="200"></canvas>
+        <div class="stats" id="stats-change" style="margin-top:14px"></div>
+      </div>
+      <div class="card" id="transition-card" style="display:none">
+        <h3>Transition matrix (rows = before, cols = after)</h3>
+        <table class="metrics-table" id="transition-table"></table>
+        <div class="hint">Reading example: row "Agriculture", column "Urban" = pixels converted from farmland to built-up area.</div>
+      </div>
+    </div>
+
+    <div class="actions" id="actions-change" style="display:none">
+      <button class="ghost" id="export-change-pdf">Export PDF report</button>
+    </div>
+  </div>
+
+  <!-- HISTORY PANEL -->
+  <div class="panel" id="panel-history">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0">Recent analyses</h3>
+        <button class="ghost" id="clear-history">Clear history</button>
+      </div>
+      <div id="history-list" class="hint">Loading…</div>
+    </div>
+  </div>
+
+  <!-- METHODS PANEL -->
+  <div class="panel" id="panel-about">
+    <div class="card">
+      <h3>How each output is computed</h3>
+      <p><strong>Segmentation:</strong> {{ "a trained U-Net CNN" if mode == "cnn" else "a documented RGB spectral-index heuristic (no learning capacity — train the U-Net for production accuracy)" }} assigns each pixel to Urban, Forest, Water, Agriculture, or Bare land.</p>
+      <p><strong>Vegetation index:</strong> a proxy-NDVI (Excess Green: 2G−R−B) rendered on a brown→yellow→green ramp. Swap in a real NIR band for true NDVI = (NIR−R)/(NIR+R).</p>
+      <p><strong>Confidence map:</strong> CNN mode shows 1 − normalized softmax entropy per pixel; heuristic mode shows the margin between the top rule and its runner-up.</p>
+      <p><strong>Landscape metrics:</strong> patch count, mean patch size, and edge density per class — standard fragmentation indicators (FRAGSTATS-style) used in landscape ecology to describe habitat fragmentation and urban sprawl pattern, not just raw area.</p>
+      <p><strong>Change-detection summary:</strong> Urban Expansion Rate = % of the scene newly converted to Urban; Vegetation Loss Rate = % of previously vegetated (Forest+Agriculture) area converted to something else.</p>
+      <p><strong>Large images (CNN mode):</strong> rather than squashing a whole scene down to the model's 256×256 input and losing detail, large images are classified with overlapping sliding-window tiles that are stitched back together at full resolution.</p>
+      <p><strong>History:</strong> every run is logged to a local SQLite database (<code>history.db</code>) so past analyses survive a page refresh or server restart — see the History tab.</p>
+      <p><strong>Reports:</strong> the "Export PDF report" buttons build a print-ready document (maps, statistics table, vegetation index, landscape metrics) via ReportLab, server-side.</p>
+    </div>
+  </div>
+
+  <footer>Land-cover classes: Urban · Forest · Water · Agriculture · Bare land. Click a legend swatch to isolate that class in the map.</footer>
+</div>
+
+<script>
+const COLORS = {{ class_colors | tojson }};
+const NAMES = {{ class_names | tojson }};
+
+// ---------- theme ----------
+const themeBtn = document.getElementById('themeBtn');
+function setTheme(t){ document.documentElement.setAttribute('data-theme', t); themeBtn.textContent = t==='dark' ? '☀️' : '🌙'; localStorage.setItem('terra-theme', t); }
+setTheme(localStorage.getItem('terra-theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+themeBtn.addEventListener('click', () => setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+
+// ---------- tabs ----------
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+  if (t.dataset.tab === 'history') loadHistory();
+}));
+
+async function loadHistory() {
+  const listEl = document.getElementById('history-list');
+  listEl.textContent = 'Loading…';
+  try {
+    const res = await fetch('/api/history?limit=20');
+    const items = await res.json();
+    if (!items.length) { listEl.textContent = 'No analyses yet — run a classification or change-detection to see it here.'; return; }
+    listEl.innerHTML = items.map(it => {
+      const headline = it.kind === 'classify'
+        ? Object.entries(it.stats).sort((a,b) => b[1].percent - a[1].percent).slice(0,2).map(([n,s]) => `${n} ${s.percent}%`).join(' · ')
+        : `Urban +${it.stats.urban_expansion_rate_percent ?? '—'}% · Veg −${it.stats.vegetation_loss_rate_percent ?? '—'}%`;
+      const when = new Date(it.created_at).toLocaleString();
+      return `<div class="history-item">
+        <img src="${it.thumbnail_base64}" alt="">
+        <div class="history-meta">
+          <div><strong>${it.kind === 'classify' ? 'Classification' : 'Change detection'}</strong> · ${it.engine}</div>
+          <div>${headline}</div>
+          <div class="when">${when}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) { listEl.textContent = 'Could not load history.'; }
+}
+
+document.getElementById('clear-history').addEventListener('click', async () => {
+  if (!confirm('Clear all saved analysis history?')) return;
+  await fetch('/api/history', { method: 'DELETE' });
+  loadHistory();
+});
+
+function wireDrop(dropId, inputId, previewId, onReady) {
+  const drop = document.getElementById(dropId);
+  const input = document.getElementById(inputId), preview = document.getElementById(previewId);
+
+  const handleFile = (file) => {
+    if (!file) return;
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+    onReady();
+  };
+
+  input.addEventListener('change', () => handleFile(input.files[0]));
+
+  ['dragenter', 'dragover'].forEach(evt => drop.addEventListener(evt, e => {
+    e.preventDefault(); e.stopPropagation(); drop.classList.add('drag-active');
+  }));
+  ['dragleave', 'dragend'].forEach(evt => drop.addEventListener(evt, e => {
+    e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag-active');
+  }));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); e.stopPropagation();
+    drop.classList.remove('drag-active');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;   // keep the <input> in sync so later FormData reads work
+    handleFile(file);
+  });
+}
+
+function renderLegend(activeClickable) {
+  const el = document.getElementById('legend');
+  el.innerHTML = NAMES.map((n,i)=>`<span data-i="${i}"><span class="swatch" style="background:rgb(${COLORS[i]})"></span>${n}</span>`).join('');
+  if (activeClickable) {
+    el.querySelectorAll('span').forEach(s => s.addEventListener('click', () => {
+      const wasActive = s.classList.contains('active');
+      el.querySelectorAll('span').forEach(x => x.classList.remove('active'));
+      if (!wasActive) { s.classList.add('active'); isolateClass(parseInt(s.dataset.i)); }
+      else resetOverlay();
+    }));
+  }
+}
+renderLegend(true);
+
+let pieChart, changeChart, lastStats, lastData, baseOverlaySrc;
+
+function renderStats(container, statsObj, showArea) {
+  container.innerHTML = '';
+  NAMES.forEach((name, i) => {
+    const s = statsObj[name];
+    const areaTxt = showArea && s.km2 !== undefined ? ` · ${s.km2} km²` : '';
+    const row = document.createElement('div');
+    row.className = 'stat-row';
+    row.innerHTML = `<div class="stat-label">${name}</div>
+      <div class="stat-bar-bg"><div class="stat-bar" style="width:${s.percent}%;background:rgb(${COLORS[i]})"></div></div>
+      <div class="stat-val">${s.percent}%${areaTxt}</div>`;
+    container.appendChild(row);
+  });
+}
+
+function drawPie(canvasId, statsObj) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  const data = NAMES.map(n => statsObj[n].percent);
+  if (window[canvasId+'chart']) window[canvasId+'chart'].destroy();
+  window[canvasId+'chart'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: NAMES, datasets: [{ data, backgroundColor: COLORS.map(c=>`rgb(${c})`) }] },
+    options: { plugins: { legend: { display: false } } }
+  });
+}
+
+// ---------- single classify ----------
+wireDrop('drop-single','file-single','preview-single', () => document.getElementById('btn-single').disabled = false);
+
+document.getElementById('btn-single').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-single');
+  btn.disabled = true; btn.textContent = 'Classifying…';
+  const fd = new FormData();
+  fd.append('image', document.getElementById('file-single').files[0]);
+  const gsd = document.getElementById('gsd-single').value;
+  if (gsd) fd.append('gsd', gsd);
+  const engineSel = document.getElementById('engine-single');
+  if (engineSel && engineSel.value) fd.append('engine', engineSel.value);
+
+  const res = await fetch('/api/classify', { method:'POST', body: fd });
+  const data = await res.json();
+  btn.disabled = false; btn.textContent = 'Classify land cover';
+  if (data.error) { alert(data.error); return; }
+  lastData = data; lastStats = data.stats;
+  baseOverlaySrc = data.overlay_png_base64;
+
+  document.getElementById('result-single').src = baseOverlaySrc;
+  document.getElementById('compare-wrap').style.display = 'block';
+  document.getElementById('compare-slider').style.display = 'block';
+  updateCompareSlider();
+
+  document.getElementById('extra-maps').style.display = 'grid';
+  document.getElementById('veg-map').src = data.vegetation_index_base64;
+  document.getElementById('conf-map').src = data.confidence_map_base64;
+  document.getElementById('actions-single').style.display = 'flex';
+  document.getElementById('engine-used-note').textContent = 'Engine used: ' + data.engine_used;
+
+  const tbody = document.querySelector('#landscape-table tbody');
+  tbody.innerHTML = NAMES.map(n => {
+    const m = data.landscape_metrics[n];
+    return `<tr><td>${n}</td><td>${m.patch_count}</td><td>${m.mean_patch_size_px}</td><td>${m.edge_density}</td></tr>`;
+  }).join('');
+
+  renderStats(document.getElementById('stats-single'), data.stats, !!gsd);
+  drawPie('pieChart', data.stats);
+});
+
+document.getElementById('compare-slider').addEventListener('input', updateCompareSlider);
+function updateCompareSlider() {
+  const v = document.getElementById('compare-slider').value;
+  document.getElementById('overlay-clip').style.width = v + '%';
+}
+
+function isolateClass(idx) {
+  const img = document.getElementById('result-single');
+  const canvas = document.createElement('canvas');
+  const tmp = new Image();
+  tmp.crossOrigin = 'anonymous';
+  tmp.onload = () => {
+    canvas.width = tmp.width; canvas.height = tmp.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(tmp, 0, 0);
+    const d = ctx.getImageData(0,0,canvas.width,canvas.height);
+    const target = COLORS[idx];
+    for (let i=0;i<d.data.length;i+=4){
+      if (!(d.data[i]===target[0] && d.data[i+1]===target[1] && d.data[i+2]===target[2])) {
+        const gray = 235;
+        d.data[i]=gray; d.data[i+1]=gray; d.data[i+2]=gray;
+      }
+    }
+    ctx.putImageData(d,0,0);
+    img.src = canvas.toDataURL();
+  };
+  tmp.src = baseOverlaySrc;
+}
+function resetOverlay(){ document.getElementById('result-single').src = baseOverlaySrc; }
+
+document.getElementById('export-csv').addEventListener('click', () => {
+  let csv = 'Class,Percent,Pixels\n';
+  NAMES.forEach(n => { const s = lastStats[n]; csv += `${n},${s.percent},${s.pixels}\n`; });
+  downloadBlob(csv, 'terra_landcover_stats.csv', 'text/csv');
+});
+document.getElementById('export-json').addEventListener('click', () => {
+  downloadBlob(JSON.stringify(lastData, null, 2), 'terra_landcover_report.json', 'application/json');
+});
+function downloadBlob(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+}
+async function downloadPdf(url, formData, btn, filename) {
+  const originalText = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Building PDF…';
+  try {
+    const res = await fetch(url, { method: 'POST', body: formData });
+    if (!res.ok) { const err = await res.json().catch(()=>({error:'Export failed'})); alert(err.error || 'Export failed'); return; }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  } finally { btn.disabled = false; btn.textContent = originalText; }
+}
+
+document.getElementById('export-pdf').addEventListener('click', () => {
+  const fd = new FormData();
+  fd.append('image', document.getElementById('file-single').files[0]);
+  const gsd = document.getElementById('gsd-single').value;
+  if (gsd) fd.append('gsd', gsd);
+  const engineSel = document.getElementById('engine-single');
+  if (engineSel && engineSel.value) fd.append('engine', engineSel.value);
+  downloadPdf('/api/export-pdf', fd, document.getElementById('export-pdf'), 'terra_landcover_report.pdf');
+});
+
+// ---------- change detection ----------
+let readyBefore = false, readyAfter = false;
+function checkChangeReady(){ document.getElementById('btn-change').disabled = !(readyBefore && readyAfter); }
+wireDrop('drop-before','file-before','preview-before', () => { readyBefore = true; checkChangeReady(); });
+wireDrop('drop-after','file-after','preview-after', () => { readyAfter = true; checkChangeReady(); });
+
+document.getElementById('btn-change').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-change');
+  btn.disabled = true; btn.textContent = 'Analyzing…';
+  const fd = new FormData();
+  fd.append('image_before', document.getElementById('file-before').files[0]);
+  fd.append('image_after', document.getElementById('file-after').files[0]);
+  const gsd = document.getElementById('gsd-change').value;
+  if (gsd) fd.append('gsd', gsd);
+
+  const res = await fetch('/api/change-detection', { method:'POST', body: fd });
+  const data = await res.json();
+  btn.disabled = false; btn.textContent = 'Detect change';
+  if (data.error) { alert(data.error); return; }
+
+  document.getElementById('result-before').src = data.overlay_before_base64;
+  document.getElementById('result-after').src = data.overlay_after_base64;
+  document.getElementById('change-maps').style.display = 'grid';
+
+  const badges = document.getElementById('summary-badges');
+  badges.style.display = 'flex';
+  badges.innerHTML = `
+    <div class="badge"><div class="num">${data.summary.urban_expansion_rate_percent ?? '—'}%</div><div class="lab">Urban expansion rate</div></div>
+    <div class="badge"><div class="num">${data.summary.vegetation_loss_rate_percent ?? '—'}%</div><div class="lab">Vegetation loss rate</div></div>`;
+
+  const container = document.getElementById('stats-change');
+  container.innerHTML = '';
+  const beforeVals = [], afterVals = [];
+  NAMES.forEach(name => {
+    const c = data.per_class_change[name];
+    beforeVals.push(c.before_percent); afterVals.push(c.after_percent);
+    const sign = c.delta_percent > 0 ? '+' : '';
+    const cls = c.delta_percent > 0 ? 'delta-up' : (c.delta_percent < 0 ? 'delta-down' : '');
+    const row = document.createElement('div');
+    row.className = 'stat-row';
+    row.innerHTML = `<div class="stat-label">${name}</div>
+      <div style="flex:1;font-size:.85rem">${c.before_percent}% → ${c.after_percent}%</div>
+      <div class="stat-val ${cls}">${sign}${c.delta_percent}%</div>`;
+    container.appendChild(row);
+  });
+  document.getElementById('change-stats-card').style.display = 'block';
+
+  const ctx = document.getElementById('changeChart').getContext('2d');
+  if (changeChart) changeChart.destroy();
+  changeChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: NAMES, datasets: [
+      { label: 'Before', data: beforeVals, backgroundColor: '#8a9a86' },
+      { label: 'After', data: afterVals, backgroundColor: '#a5622f' }
+    ]},
+    options: { scales: { y: { beginAtZero: true, title: { display:true, text:'%' } } } }
+  });
+
+  if (data.transition_matrix) {
+    const table = document.getElementById('transition-table');
+    let html = '<tr><th></th>' + NAMES.map(n=>`<th>${n}</th>`).join('') + '</tr>';
+    data.transition_matrix.forEach((row, i) => {
+      html += `<tr><th>${NAMES[i]}</th>` + row.map(v => `<td>${v}</td>`).join('') + '</tr>';
+    });
+    table.innerHTML = html;
+    document.getElementById('transition-card').style.display = 'block';
+  }
+  document.getElementById('actions-change').style.display = 'flex';
+});
+
+document.getElementById('export-change-pdf').addEventListener('click', () => {
+  const fd = new FormData();
+  fd.append('image_before', document.getElementById('file-before').files[0]);
+  fd.append('image_after', document.getElementById('file-after').files[0]);
+  const gsd = document.getElementById('gsd-change').value;
+  if (gsd) fd.append('gsd', gsd);
+  downloadPdf('/api/export-change-pdf', fd, document.getElementById('export-change-pdf'), 'terra_change_report.pdf');
+});
+</script>
+</body>
+</html>

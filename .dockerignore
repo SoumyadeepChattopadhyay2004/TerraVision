@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.git/
+.pytest_cache/
+history.db
+checkpoints/*.pt
+data/train/images/*
+data/train/masks/*
+data/val/images/*
+data/val/masks/*
